@@ -145,13 +145,13 @@ The `PersianTTSfarsi` library was chosen for its reliable performance in convert
 
 ## Code Repository Structure
 
-* `tts.py`: Python script for integrating object detection with the Persian Text-to-Speech system.
+* `demo.py`: Python script for integrating object detection with the Persian Text-to-Speech system.
 
 * `cleaning.ipynb`: Jupyter Notebook detailing the data collection, cleaning, and preprocessing steps.
 
 * `training.ipynb`: Jupyter Notebook for merging datasets, applying data augmentation, and training the YOLOv8n model.
 
-* `SmartCane-AI-Visual-Navigation-System_dataset_and_model_links.txt`: A text file containing the Google Drive links for the dataset and the trained model weights.
+* `dataset_link.txt`: A text file containing the Google Drive links for the dataset and the trained model weights.
 
 ## Future Work
 
