@@ -94,7 +94,7 @@ The model exhibits excellent overall **mAP@0.5 of 0.877**, indicating its high a
 ### Confusion Matrix
 
 *Figure 1: Confusion Matrix Plot*
-
+![confusion_matrix](./confusion_matrix.png)
 The confusion matrix provides a visual representation of the model's ability to correctly classify each object, with strong diagonal values indicating accurate detections.
 
 ## Text-to-Speech (TTS) Integration
