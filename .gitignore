@@ -1,0 +1,16 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Demo output
+output/
+*.mp3
+
+# Datasets and training runs are not tracked
+datasets/
+runs/
+*.zip
+
+.ipynb_checkpoints/
+.DS_Store

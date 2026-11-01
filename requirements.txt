@@ -1,0 +1,11 @@
+ultralytics>=8.0
+opencv-python
+persianttsfarsi
+
+# Used by the notebooks only
+roboflow
+albumentations
+matplotlib
+pyyaml
+tqdm
+Pillow

@@ -1,27 +1,35 @@
+"""Run the SmartCane detector on an image and speak the navigation cues in Persian.
+
+Usage:
+    python demo.py --weights models/yolov8n_0.88_58.pt --source path/to/image.jpg
+    python demo.py --weights models/yolov8n_0.88_58.pt --source path/to/images/  --save-annotated
+"""
+
+import argparse
 import os
 import random
-from ultralytics import YOLO
-from IPython.display import Audio, display
-import matplotlib.pyplot as plt
+
 import cv2
 from persianttsfarsi import PersianTTS
+from ultralytics import YOLO
 
+IMAGE_EXTENSIONS = (".jpg", ".jpeg", ".png")
 
-# --- Persian direction messages ---
+# Where to steer the user, relative to the detected object.
 directions_fa = {
     "left": "کمی به چپ بروید",
     "center": "مستقیم بروید",
-    "right": "کمی به راست بروید"
+    "right": "کمی به راست بروید",
 }
 
-# --- Special safety-line directions ---
+# The platform edge line is a hazard, not a target, so the advice is inverted:
+# the user is told to move away from it rather than towards it.
 safety_line_directions_fa = {
     "left": "به خط زرد لبه سکو نزدیک هستید، کمی به راست بروید",
     "center": "به خط زرد لبه سکو نزدیک هستید، کمی عقب بروید",
-    "right": "به خط زرد لبه سکو نزدیک هستید، کمی به چپ بروید"
+    "right": "به خط زرد لبه سکو نزدیک هستید، کمی به چپ بروید",
 }
 
-# --- Class messages in Persian ---
 class_messages_fa = {
     "shelter": "ایستگاه اتوبوس نزدیک است. {}",
     "crosswalk": "خط عابر پیاده نزدیک است. {}",
@@ -29,56 +37,77 @@ class_messages_fa = {
     "downstair": "راه پله به سمت پایین نزدیک است. {}",
     "upstair": "راه پله به سمت بالا نزدیک است. {}",
     "green": "چراغ سبز است. عبور کنید.",
-    "red": "چراغ قرمز است. توقف کنید."
+    "red": "چراغ قرمز است. توقف کنید.",
 }
 
-test_images_path = r"D:\Edu\test\images"    # replace this 
 
-image_files = [f for f in os.listdir(test_images_path) if f.lower().endswith((".jpg", ".png", ".jpeg"))]
-sample_image = os.path.join(test_images_path, random.choice(image_files))
-print(f"🖼 Selected image: {sample_image}")
-
-model = YOLO(r"D:\yolov8n_0.88.pt")    # replace this
-results = model(sample_image)
-
-plt.imshow(cv2.cvtColor(results[0].plot(), cv2.COLOR_BGR2RGB))
-plt.axis("off")
-plt.show()
-
-img = cv2.imread(sample_image)
-img_width = img.shape[1]
-
-for r in results:
-    for box in r.boxes:
-        cls_id = int(box.cls.cpu().numpy())
-        class_name = model.names[cls_id]
-
-        x1, y1, x2, y2 = box.xyxy[0].cpu().numpy()
-        obj_center_x = (x1 + x2) / 2
-
-        if obj_center_x < img_width / 3:
-            position = "left"
-        elif obj_center_x > 2 * img_width / 3:
-            position = "right"
-        else:
-            position = "center"
-
-        if class_name in ["green", "red"]:
-            message_fa = class_messages_fa[class_name]
-
-        elif class_name == "safety-line":
-            message_fa = safety_line_directions_fa[position]
-
-        else:
-            direction_msg = directions_fa[position]
-            message_fa = class_messages_fa[class_name].format(direction_msg)
-
-        print(f"🔊 پیام: {message_fa}")
-
-        tts = PersianTTS()
-        tts.synthesize(message_fa, "output1.mp3")
-
-        from IPython.display import Audio
-        display(Audio("output1.mp3", autoplay=True))
+def resolve_image(source):
+    """Return a single image path; a directory yields a random image inside it."""
+    if os.path.isdir(source):
+        images = [f for f in os.listdir(source) if f.lower().endswith(IMAGE_EXTENSIONS)]
+        if not images:
+            raise SystemExit(f"No images found in {source}")
+        return os.path.join(source, random.choice(images))
+    return source
 
 
+def horizontal_position(box, image_width):
+    """Bucket a box into the left, centre or right third of the frame."""
+    x1, _, x2, _ = box.xyxy[0].cpu().numpy()
+    center_x = (x1 + x2) / 2
+    if center_x < image_width / 3:
+        return "left"
+    if center_x > 2 * image_width / 3:
+        return "right"
+    return "center"
+
+
+def navigation_message(class_name, position):
+    if class_name in ("green", "red"):
+        return class_messages_fa[class_name]
+    if class_name == "safety-line":
+        return safety_line_directions_fa[position]
+    return class_messages_fa[class_name].format(directions_fa[position])
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--weights", default="models/yolov8n_0.88_58.pt",
+                        help="path to the trained YOLOv8 weights")
+    parser.add_argument("--source", required=True,
+                        help="image file, or a directory to pick a random image from")
+    parser.add_argument("--output-dir", default="output",
+                        help="where the generated .mp3 files are written")
+    parser.add_argument("--conf", type=float, default=0.25,
+                        help="confidence threshold")
+    parser.add_argument("--save-annotated", action="store_true",
+                        help="also write the image with boxes drawn on it")
+    args = parser.parse_args()
+
+    image_path = resolve_image(args.source)
+    os.makedirs(args.output_dir, exist_ok=True)
+    print(f"Image: {image_path}")
+
+    model = YOLO(args.weights)
+    results = model(image_path, conf=args.conf)
+    image_width = cv2.imread(image_path).shape[1]
+
+    if args.save_annotated:
+        annotated_path = os.path.join(args.output_dir, "annotated.jpg")
+        cv2.imwrite(annotated_path, results[0].plot())
+        print(f"Annotated image: {annotated_path}")
+
+    tts = PersianTTS()
+    for index, box in enumerate(results[0].boxes):
+        class_name = model.names[int(box.cls.cpu().numpy())]
+        message = navigation_message(class_name, horizontal_position(box, image_width))
+        audio_path = os.path.join(args.output_dir, f"cue_{index:02d}.mp3")
+        tts.synthesize(message, audio_path)
+        print(f"[{class_name}] {message} -> {audio_path}")
+
+    if not len(results[0].boxes):
+        print("No objects detected.")
+
+
+if __name__ == "__main__":
+    main()
